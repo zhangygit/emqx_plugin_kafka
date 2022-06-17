@@ -92,39 +92,11 @@ on_client_connack(ConnInfo = #{clientid := ClientId}, Rc, Props, _Env) ->
 on_client_connected(ClientInfo = #{clientid := ClientId}, ConnInfo, _Env) ->
   ?LOG_INFO("[KAFKA PLUGIN]Client(~s) connected, ClientInfo:~n~p~n, ConnInfo:~n~p~n",
     [ClientId, ClientInfo, ConnInfo]),
-  {IpAddr, _Port} = maps:get(peername, ConnInfo),
-  Action = <<"connected">>,
-  Now = now_mill_secs(os:timestamp()),
-  Online = 1,
-  Payload = [
-    {action, Action},
-    {device_id, ClientId},
-    {username, maps:get(username, ClientInfo)},
-    {keepalive, maps:get(keepalive, ConnInfo)},
-    {ipaddress, iolist_to_binary(ntoa(IpAddr))},
-    {proto_name, maps:get(proto_name, ConnInfo)},
-    {proto_ver, maps:get(proto_ver, ConnInfo)},
-    {ts, Now},
-    {online, Online}
-  ],
-  produce_kafka_payload(ClientId, Payload),
   ok.
 
 on_client_disconnected(ClientInfo = #{clientid := ClientId}, ReasonCode, ConnInfo, _Env) ->
   ?LOG_INFO("[KAFKA PLUGIN]Client(~s) disconnected due to ~p, ClientInfo:~n~p~n, ConnInfo:~n~p~n",
     [ClientId, ReasonCode, ClientInfo, ConnInfo]),
-  Action = <<"disconnected">>,
-  Now = now_mill_secs(os:timestamp()),
-  Online = 0,
-  Payload = [
-    {action, Action},
-    {device_id, ClientId},
-    {username, maps:get(username, ClientInfo)},
-    {reason, ReasonCode},
-    {ts, Now},
-    {online, Online}
-  ],
-  produce_kafka_payload(ClientId, Payload),
   ok.
 
 on_client_authenticate(_ClientInfo = #{clientid := ClientId}, Result, _Env) ->
@@ -139,32 +111,10 @@ on_client_check_acl(_ClientInfo = #{clientid := ClientId}, Topic, PubSub, Result
 %%---------------------------client subscribe start--------------------------%%
 on_client_subscribe(#{clientid := ClientId}, _Properties, TopicFilters, _Env) ->
   ?LOG_INFO("[KAFKA PLUGIN]Client(~s) will subscribe: ~p~n", [ClientId, TopicFilters]),
-  Topic = erlang:element(1, erlang:hd(TopicFilters)),
-  Qos = erlang:element(2, lists:last(TopicFilters)),
-  Action = <<"subscribe">>,
-  Now = now_mill_secs(os:timestamp()),
-  Payload = [
-    {device_id, ClientId},
-    {action, Action},
-    {topic, Topic},
-    {qos, maps:get(qos, Qos)},
-    {ts, Now}
-  ],
-  produce_kafka_payload(ClientId, Payload),
   ok.
 %%---------------------client subscribe stop----------------------%%
 on_client_unsubscribe(#{clientid := ClientId}, _Properties, TopicFilters, _Env) ->
   ?LOG_INFO("[KAFKA PLUGIN]Client(~s) will unsubscribe ~p~n", [ClientId, TopicFilters]),
-  Topic = erlang:element(1, erlang:hd(TopicFilters)),
-  Action = <<"unsubscribe">>,
-  Now = now_mill_secs(os:timestamp()),
-  Payload = [
-    {device_id, ClientId},
-    {action, Action},
-    {topic, Topic},
-    {ts, Now}
-  ],
-  produce_kafka_payload(ClientId, Payload),
   ok.
 
 on_message_dropped(#message{topic = <<"$SYS/", _/binary>>}, _By, _Reason, _Env) ->
@@ -187,43 +137,11 @@ on_message_publish(Message, _Env) ->
 on_message_delivered(_ClientInfo = #{clientid := ClientId}, Message, _Env) ->
   ?LOG_INFO("[KAFKA PLUGIN]Message delivered to client(~s): ~s~n",
     [ClientId, emqx_message:format(Message)]),
-  Topic = Message#message.topic,
-  Payload = Message#message.payload,
-  Qos = Message#message.qos,
-  From = Message#message.from,
-  Timestamp = Message#message.timestamp,
-  Content = [
-    {action, <<"message_delivered">>},
-    {from, From},
-    {to, ClientId},
-    {topic, Topic},
-    {payload, Payload},
-    {qos, Qos},
-    {cluster_node, node()},
-    {ts, Timestamp}
-  ],
-  produce_kafka_payload(ClientId, Content),
   ok.
 
 on_message_acked(_ClientInfo = #{clientid := ClientId}, Message, _Env) ->
   ?LOG_INFO("[KAFKA PLUGIN]Message acked by client(~s): ~s~n",
     [ClientId, emqx_message:format(Message)]),
-  Topic = Message#message.topic,
-  Payload = Message#message.payload,
-  Qos = Message#message.qos,
-  From = Message#message.from,
-  Timestamp = Message#message.timestamp,
-  Content = [
-    {action, <<"message_acked">>},
-    {from, From},
-    {to, ClientId},
-    {topic, Topic},
-    {payload, Payload},
-    {qos, Qos},
-    {cluster_node, node()},
-    {ts, Timestamp}
-  ],
-  produce_kafka_payload(ClientId, Content),
   ok.
 
 %%--------------------------------------------------------------------
